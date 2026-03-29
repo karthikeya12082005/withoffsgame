@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wythoff's Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+:root {
+  --bg:       #0d0d0f;
+  --bg2:      #141416;
+  --bg3:      #1c1c1f;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --gold:     #c9a84c;
+  --gold2:    #e8c87a;
+  --gold-dim: rgba(201,168,76,0.10);
+  --cream:    #f0ead8;
+  --muted:    rgba(240,234,216,0.42);
+  --muted2:   rgba(240,234,216,0.20);
+  --p1c:      #c04060;
+  --p2c:      #3a80c0;
+  --ppos-bg:  rgba(48,122,76,0.28);
+  --ppos-dot: #5ed490;
+  --win-bg:   #3a0c14;
+  --q-bg:     #3e3008;
+  --reach-bg: rgba(58,128,192,0.20);
+  --reach-pp: rgba(48,122,76,0.26);
+  --cell-l:   #cdc0a0;
+  --cell-d:   #8c7049;
+}
+
+body {
+  background: var(--bg);
+  color: var(--cream);
+  font-family: 'DM Mono', monospace;
+  font-weight: 300;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen { flex: 1; display: flex; flex-direction: column; }
+.screen.hidden { display: none; }
+
+/* ═══════════════════════════════
+   SETUP SCREEN
+═══════════════════════════════ */
+#screen-setup {
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 2rem 1rem;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 300;
+  color: var(--cream);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.brand-title em { font-style: italic; color: var(--gold2); }
+.brand-sub {
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-align: center;
+  margin-top: 6px;
+}
+
+.setup-card {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+}
+.setup-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin-bottom: 3px;
+}
+.setup-card .sub { font-size: 0.57rem; color: var(--muted2); margin-bottom: 1.4rem; letter-spacing: 0.05em; }
+
+.coord-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.field label {
+  display: block;
+  font-size: 0.53rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted2);
+  margin-bottom: 5px;
+}
+.field input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--cream);
+  font-family: 'DM Mono', monospace;
+  font-size: 1.15rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  border-radius: 0;
+}
+.field input:focus { border-color: var(--gold); }
+
+.pos-hint {
+  font-size: 0.57rem;
+  line-height: 1.9;
+  color: var(--muted);
+  padding: 9px 12px;
+  border-left: 2px solid var(--gold);
+  background: var(--gold-dim);
+  margin-bottom: 1.3rem;
+  min-height: 42px;
+}
+.hl  { color: var(--gold2); }
+.hlg { color: var(--ppos-dot); }
+.hlr { color: #e06070; }
+
+.btn-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.57rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--cream);
+  cursor: pointer;
+  transition: all 0.17s;
+  outline: none;
+  border-radius: 0;
+}
+.btn:hover { background: var(--bg3); border-color: var(--cream); }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #0d0d0f; font-weight: 400; }
+.btn.primary:hover { background: var(--gold2); border-color: var(--gold2); }
+.btn.full { grid-column: 1/-1; }
+.err { font-size: 0.57rem; color: var(--p1c); min-height: 16px; margin-top: 6px; }
+
+.rules-strip {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 2rem;
+  max-width: 700px;
+  width: 100%;
+}
+.rule-item .rn {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem;
+  font-weight: 300;
+  color: var(--gold);
+  opacity: 0.35;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+.rule-item .rt { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cream); margin-bottom: 4px; }
+.rule-item .rb { font-size: 0.57rem; color: var(--muted); line-height: 1.85; }
+
+/* ═══════════════════════════════
+   GAME SCREEN  — 3-column layout
+═══════════════════════════════ */
+#screen-game {
+  flex-direction: row;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.panel-l {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem 1rem;
+  gap: 0.9rem;
+  overflow-y: auto;
+}
+
+.player-block {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  transition: border-color 0.25s, background 0.25s;
+}
+.player-block.act1 { border-color: var(--p1c); background: rgba(192,64,96,0.07); }
+.player-block.act2 { border-color: var(--p2c); background: rgba(58,128,192,0.07); }
+.pb-tag { font-size: 0.48rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted2); margin-bottom: 2px; }
+.player-block.act1 .pb-tag { color: var(--p1c); }
+.player-block.act2 .pb-tag { color: var(--p2c); }
+.pb-name { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; }
+
+.div { height: 1px; background: var(--border); flex-shrink: 0; }
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.sb { background: var(--bg2); border: 1px solid var(--border); padding: 7px 9px; }
+.sb .sl { font-size: 0.47rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted2); margin-bottom: 2px; }
+.sb .sv { font-size: 0.95rem; font-family: 'Cormorant Garamond', serif; color: var(--cream); }
+
+.legend { display: flex; flex-direction: column; gap: 5px; }
+.leg-t { font-size: 0.47rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted2); margin-bottom: 2px; }
+.leg-i { display: flex; align-items: center; gap: 6px; font-size: 0.52rem; color: var(--muted); line-height: 1.3; }
+.leg-sq { width: 11px; height: 11px; flex-shrink: 0; border-radius: 1px; }
+
+.log-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+.log-t { font-size: 0.47rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted2); }
+.log-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.log-list::-webkit-scrollbar { width: 2px; }
+.log-list::-webkit-scrollbar-thumb { background: var(--border2); }
+.log-e { font-size: 0.52rem; color: var(--muted2); display: flex; gap: 5px; padding: 2px 3px; }
+.log-e .lp { font-weight: 400; }
+.log-e.lp1 .lp { color: var(--p1c); }
+.log-e.lp2 .lp { color: var(--p2c); }
+
+/* ── CENTER — BOARD ── */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0.5rem;
+  gap: 0.7rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.status-bar {
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-align: center;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  letter-spacing: 0.03em;
+  line-height: 1.6;
+}
+.s-tag {
+  padding: 2px 8px;
+  border-radius: 1px;
+  font-size: 0.6rem;
+  font-family: 'Cormorant Garamond', serif;
+}
+.s-tag.pp { border: 1px solid var(--ppos-dot); color: var(--ppos-dot); }
+.s-tag.np { border: 1px solid var(--border2); color: var(--cream); }
+
+/* Board wrapper keeps it square */
+.board-outer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* size set by JS */
+}
+.col-axis {
+  display: flex;
+  margin-bottom: 2px;
+}
+.ax-lbl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted2);
+  font-size: 9px;
+  font-family: 'DM Mono', monospace;
+  flex-shrink: 0;
+}
+.board-rows { display: flex; flex-direction: column; }
+.board-row  { display: flex; flex-direction: row; align-items: center; }
+
+/* THE BOARD */
+#board {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  grid-template-rows:    repeat(16, 1fr);
+  border: 1.5px solid rgba(255,255,255,0.14);
+  box-shadow: 0 16px 60px rgba(0,0,0,0.75);
+  flex-shrink: 0;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: default;
+  overflow: hidden;
+}
+.cell.cl { background: var(--cell-l); }
+.cell.cd { background: var(--cell-d); }
+
+/* overlays */
+.cell.is-ppos::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--ppos-bg);
+  pointer-events: none;
+  z-index: 1;
+}
+.cell.is-ppos::before {
+  content: '';
+  position: absolute;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--ppos-dot);
+  bottom: 2px; right: 2px;
+  pointer-events: none;
+  z-index: 2;
+}
+.cell.is-win { background: var(--win-bg) !important; }
+.cell.is-queen { background: var(--q-bg) !important; }
+.cell.is-queen::after { content:''; position:absolute; inset:0; background:rgba(201,168,76,0.18); pointer-events:none; z-index:1; }
+
+.cell.is-reach { cursor: pointer; }
+.cell.is-reach::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--reach-bg);
+  pointer-events: none;
+  z-index: 1;
+}
+.cell.is-reach:hover::after { background: rgba(58,128,192,0.42); }
+.cell.is-reach.is-ppos::after { background: var(--reach-pp); }
+.cell.is-reach.is-ppos:hover::after { background: rgba(48,122,76,0.52); }
+
+/* queen glyph */
+.qg {
+  position: relative; z-index: 3;
+  line-height: 1;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
+  animation: qpop 0.22s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes qpop {
+  from { transform: scale(0.3); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.qg.qp1 { color: var(--p1c); }
+.qg.qp2 { color: var(--p2c); }
+
+/* win label */
+.win-lbl {
+  position: relative; z-index: 3;
+  color: rgba(220,60,80,0.5);
+  font-family: 'DM Mono', monospace;
+  line-height: 1;
+}
+
+/* ── RIGHT PANEL ── */
+.panel-r {
+  width: 200px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem 1rem;
+  gap: 0.9rem;
+  overflow-y: auto;
+}
+
+.sec-t { font-size: 0.47rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); }
+
+.btn-sm {
+  width: 100%;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.17s;
+  text-align: left;
+  border-radius: 0;
+  display: block;
+  margin-bottom: 5px;
+}
+.btn-sm:last-child { margin-bottom: 0; }
+.btn-sm:hover { border-color: var(--cream); color: var(--cream); background: var(--bg3); }
+.btn-sm.danger:hover { border-color: var(--p1c); color: var(--p1c); }
+
+.strat-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 0.9rem;
+}
+.strat-box p { font-size: 0.55rem; color: var(--muted); line-height: 1.9; }
+.phi-line {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--gold2);
+  text-align: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 7px 0;
+}
+
+.pp-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 0.7rem 0.9rem;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pp-scroll { flex:1; overflow-y:auto; min-height:0; }
+.pp-scroll::-webkit-scrollbar { width:2px; }
+.pp-scroll::-webkit-scrollbar-thumb { background:var(--border2); }
+.pp-tbl { width:100%; border-collapse:collapse; font-size:0.52rem; }
+.pp-tbl th {
+  color:var(--muted2); font-weight:400; padding:3px 4px;
+  text-align:center; border-bottom:1px solid var(--border);
+  font-size:0.48rem; text-transform:uppercase; letter-spacing:0.07em;
+  position:sticky; top:0; background:var(--bg2);
+}
+.pp-tbl td { padding:3px 4px; text-align:center; color:var(--muted2); border-bottom:1px solid var(--border); }
+.pp-tbl tr.hl td { color:var(--gold2); background:var(--gold-dim); }
+
+/* ── MODAL ── */
+#overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.75);
+  z-index:300;
+  align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+#overlay.show { display:flex; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border2);
+  padding:2.5rem; max-width:400px; width:90%;
+  text-align:center;
+  animation:qpop 0.22s ease both;
+}
+.modal .m-ico { font-size:2.5rem; display:block; margin-bottom:0.8rem; }
+.modal h2 { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:300; margin-bottom:6px; }
+.modal p  { font-size:0.58rem; color:var(--muted); line-height:1.85; margin-bottom:1.5rem; }
+.modal .m-btns { display:flex; gap:8px; }
+.modal .m-btns .btn { flex:1; }
+
+.rules-modal { text-align:left; max-width:460px; }
+.rules-modal h2 { text-align:center; margin-bottom:1.4rem; }
+.rs { margin-bottom:1rem; }
+.rs .rst { font-size:0.52rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--gold); margin-bottom:5px; }
+.rs p, .rs li { font-size:0.58rem; color:var(--muted); line-height:1.9; }
+.rs ul { padding-left:1rem; }
+.rs li { margin-bottom:2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SETUP ═══════════════ -->
+<div id="screen-setup" class="screen">
+  <div>
+    <h1 class="brand-title">Wythoff's <em>Game</em></h1>
+    <p class="brand-sub">Two-player · One queen · 16 × 16 board</p>
+  </div>
+
+  <div class="setup-card">
+    <h3>Choose starting position</h3>
+    <p class="sub">Column and row, each from 0 to 15. The queen starts here.</p>
+    <div class="coord-grid">
+      <div class="field">
+        <label>Column (x) · 0–15</label>
+        <input type="number" id="inp-col" min="0" max="15" value="11">
+      </div>
+      <div class="field">
+        <label>Row (y) · 0–15</label>
+        <input type="number" id="inp-row" min="0" max="15" value="8">
+      </div>
+    </div>
+    <div class="pos-hint" id="pos-hint">—</div>
+    <div class="btn-group">
+      <button class="btn primary" onclick="startGame(1)">Player 1 first</button>
+      <button class="btn" onclick="startGame(2)">Player 2 first</button>
+    </div>
+    <button class="btn full" onclick="randomStart()">↺ &nbsp;Random position</button>
+    <div class="err" id="setup-err"></div>
+  </div>
+
+  <div class="rules-strip">
+    <div class="rule-item">
+      <div class="rn">01</div>
+      <div class="rt">Movement</div>
+      <p class="rb">The queen may move any number of squares left, down, or diagonally down-left. Right and up are forbidden.</p>
+    </div>
+    <div class="rule-item">
+      <div class="rn">02</div>
+      <div class="rt">Winning</div>
+      <p class="rb">Move the queen onto square (0,0) — the bottom-left corner — to win the game.</p>
+    </div>
+    <div class="rule-item">
+      <div class="rn">03</div>
+      <div class="rt">Strategy</div>
+      <p class="rb">Green squares are P-positions. Always land on one. They follow ⌊nφ⌋ and ⌊nφ²⌋ — the golden ratio.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ GAME ═══════════════ -->
+<div id="screen-game" class="screen hidden">
+
+  <aside class="panel-l">
+    <div class="player-block" id="blk1">
+      <div class="pb-tag">Player 1</div>
+      <div class="pb-name" style="color:var(--p1c);">♛ Red</div>
+    </div>
+    <div class="player-block" id="blk2">
+      <div class="pb-tag">Player 2</div>
+      <div class="pb-name" style="color:var(--p2c);">♛ Blue</div>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="stat-grid">
+      <div class="sb"><div class="sl">Queen at</div><div class="sv" id="s-pos">—</div></div>
+      <div class="sb"><div class="sl">Moves</div><div class="sv" id="s-moves">0</div></div>
+      <div class="sb"><div class="sl">Type</div><div class="sv" id="s-type" style="font-size:0.68rem;margin-top:2px;">—</div></div>
+      <div class="sb"><div class="sl">Options</div><div class="sv" id="s-opts">—</div></div>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="legend">
+      <div class="leg-t">Legend</div>
+      <div class="leg-i"><div class="leg-sq" style="background:var(--q-bg);border:1px solid var(--gold);"></div>Queen</div>
+      <div class="leg-i"><div class="leg-sq" style="background:var(--ppos-bg);border:1px solid var(--ppos-dot);"></div>P-position</div>
+      <div class="leg-i"><div class="leg-sq" style="background:var(--win-bg);border:1px solid #e06070;"></div>(0,0) — win</div>
+      <div class="leg-i"><div class="leg-sq" style="background:var(--reach-bg);border:1px solid var(--p2c);"></div>Valid move</div>
+      <div class="leg-i"><div class="leg-sq" style="background:var(--reach-pp);border:1px solid var(--ppos-dot);"></div>Valid → P-pos</div>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="log-wrap">
+      <div class="log-t">Move history</div>
+      <div class="log-list" id="move-log"></div>
+    </div>
+  </aside>
+
+  <main class="center">
+    <div class="status-bar" id="status-bar">—</div>
+
+    <div class="board-outer" id="board-outer">
+      <!-- col axis -->
+      <div class="col-axis" id="col-axis"></div>
+      <!-- rows with row labels -->
+      <div class="board-rows" id="board-rows"></div>
+    </div>
+  </main>
+
+  <aside class="panel-r">
+    <div class="sec-t">Controls</div>
+    <button class="btn-sm" onclick="toggleP()" id="btn-p">Hide P-positions</button>
+    <button class="btn-sm" onclick="showRules()">Rules &amp; strategy</button>
+    <button class="btn-sm danger" onclick="goSetup()">New game</button>
+
+    <div class="div"></div>
+
+    <div class="sec-t">Strategy</div>
+    <div class="strat-box">
+      <p>Always land on a <span style="color:var(--ppos-dot)">P-position</span>. If the start is a P-position, be the second player. From any N-position you can always reach a P-position in one move.</p>
+      <div class="phi-line">(⌊nφ⌋,&thinsp;⌊nφ²⌋)</div>
+      <p>P-positions follow the golden ratio φ ≈ 1.618. Every integer appears in exactly one pair.</p>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="sec-t">P-positions</div>
+    <div class="pp-card">
+      <div class="pp-scroll">
+        <table class="pp-tbl">
+          <thead><tr><th>n</th><th>col</th><th>row</th></tr></thead>
+          <tbody id="pp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ═══════════════ MODAL ═══════════════ -->
+<div id="overlay">
+  <div class="modal" id="m-win" style="display:none;">
+    <span class="m-ico">♛</span>
+    <h2 id="m-title">Player 1 wins!</h2>
+    <p id="m-body">The queen reached (0,0).</p>
+    <div class="m-btns">
+      <button class="btn" onclick="goSetup()">New game</button>
+      <button class="btn primary" onclick="closeModal()">Review board</button>
+    </div>
+  </div>
+  <div class="modal rules-modal" id="m-rules" style="display:none;">
+    <h2>Rules &amp; Strategy</h2>
+    <div class="rs">
+      <div class="rst">Movement</div>
+      <ul>
+        <li>One queen is shared between both players.</li>
+        <li>On your turn move the queen <strong>left</strong>, <strong>down</strong>, or <strong>diagonally down-left</strong> — any distance.</li>
+        <li>Moving right or up is forbidden. You must always move.</li>
+      </ul>
+    </div>
+    <div class="rs">
+      <div class="rst">Winning</div>
+      <p>The player who moves the queen to square (0,0) — the bottom-left corner — wins.</p>
+    </div>
+    <div class="rs">
+      <div class="rst">P-positions (green)</div>
+      <p>These are safe landing squares — the player who lands there has a guaranteed win path. Coordinates: (⌊nφ⌋, ⌊nφ²⌋) for n = 0,1,2,… where φ is the golden ratio.</p>
+    </div>
+    <div class="rs">
+      <div class="rst">Tip</div>
+      <p>Start is P-position → be Player 2. Start is N-position → be Player 1 and jump to a P-position immediately.</p>
+    </div>
+    <button class="btn primary" onclick="closeModal()" style="width:100%;margin-top:1.2rem;">Got it</button>
+  </div>
+</div>
+
+<script>
+const N = 16;
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+// ── Build P/N matrix ──
+function buildPM() {
+  const m = Array.from({length:N}, () => Array(N).fill(null));
+  m[0][0] = 'P';
+  for (let s = 1; s < 2*N; s++) {
+    for (let r = 0; r < N; r++) {
+      const c = s - r;
+      if (c < 0 || c >= N || m[r][c] !== null) continue;
+      let h = false;
+      for (let nc=c-1; nc>=0&&!h; nc--) if (m[r][nc]==='P') h=true;
+      for (let nr=r-1; nr>=0&&!h; nr--) if (m[nr][c]==='P') h=true;
+      for (let d=1; r-d>=0&&c-d>=0&&!h; d++) if (m[r-d][c-d]==='P') h=true;
+      m[r][c] = h ? 'N' : 'P';
+    }
+  }
+  return m;
+}
+const PM = buildPM();
+
+// P-positions list
+const PP = [];
+for (let n=0;;n++) {
+  const a=Math.floor(n*PHI), b=Math.floor(n*PHI*PHI);
+  if (a>=N&&b>=N) break;
+  if (a<N&&b<N) PP.push({n,c:a,r:b});
+}
+
+// ── State ──
+let qR, qC, turn, over, moves, showP = true;
+let SZ = 30; // cell pixel size
+
+// ── Setup ──
+function hint() {
+  const c=+document.getElementById('inp-col').value;
+  const r=+document.getElementById('inp-row').value;
+  const el=document.getElementById('pos-hint');
+  if (isNaN(c)||isNaN(r)||c<0||c>15||r<0||r>15){el.innerHTML='—';return;}
+  if (c===0&&r===0){el.innerHTML='<span class="hlr">(0,0) is the winning square — not a valid start.</span>';return;}
+  const t=PM[r][c];
+  el.innerHTML = t==='P'
+    ? `<span class="hl">(${c},${r})</span> is a <span class="hlg">P-position</span> — let your opponent go first. You win as second player.`
+    : `<span class="hl">(${c},${r})</span> is an <span class="hl">N-position</span> — go first and immediately jump to a P-position.`;
+}
+document.getElementById('inp-col').addEventListener('input', hint);
+document.getElementById('inp-row').addEventListener('input', hint);
+
+function randomStart() {
+  let c,r;
+  do{c=Math.floor(Math.random()*16);r=Math.floor(Math.random()*16);}while(c===0&&r===0);
+  document.getElementById('inp-col').value=c;
+  document.getElementById('inp-row').value=r;
+  hint();
+}
+
+function startGame(fp) {
+  const c=+document.getElementById('inp-col').value;
+  const r=+document.getElementById('inp-row').value;
+  const err=document.getElementById('setup-err');
+  if (isNaN(c)||isNaN(r)||c<0||c>15||r<0||r>15){err.textContent='Enter valid coordinates (0–15).';return;}
+  if (c===0&&r===0){err.textContent='(0,0) is the winning square — pick another start.';return;}
+  err.textContent='';
+  qC=c;qR=r;turn=fp;over=false;moves=0;showP=true;
+  document.getElementById('btn-p').textContent='Hide P-positions';
+  document.getElementById('move-log').innerHTML='';
+  buildPPTable();
+  document.getElementById('screen-setup').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+  requestAnimationFrame(()=>{ buildBoard(); redraw(); });
+}
+
+function goSetup(){
+  closeModal();
+  document.getElementById('screen-game').classList.add('hidden');
+  document.getElementById('screen-setup').classList.remove('hidden');
+  hint();
+}
+
+// ── Board construction ──
+function calcSZ() {
+  const center = document.querySelector('.center');
+  if(!center) return 30;
+  const W = center.clientWidth  - 60;  // room for row labels + padding
+  const H = center.clientHeight - 70;  // room for status + col labels
+  return Math.max(18, Math.min(Math.floor(W/N), Math.floor(H/N), 44));
+}
+
+function buildBoard() {
+  SZ = calcSZ();
+  const AX = Math.max(8, Math.round(SZ*0.28));
+
+  // Col axis
+  const ca = document.getElementById('col-axis');
+  ca.innerHTML='';
+  // spacer for row label width
+  const sp=document.createElement('div');
+  sp.style.cssText=`width:${SZ*0.7}px;height:${AX+4}px;flex-shrink:0;`;
+  ca.appendChild(sp);
+  for(let c=0;c<N;c++){
+    const d=document.createElement('div');
+    d.className='ax-lbl';
+    d.style.cssText=`width:${SZ}px;height:${AX+4}px;font-size:${AX}px;`;
+    d.textContent=c;
+    ca.appendChild(d);
+  }
+
+  // Board rows (row N-1 at top → row 0 at bottom)
+  const br=document.getElementById('board-rows');
+  br.innerHTML='';
+
+  for(let r=N-1;r>=0;r--){
+    const rowDiv=document.createElement('div');
+    rowDiv.className='board-row';
+
+    // row label
+    const rl=document.createElement('div');
+    rl.className='ax-lbl';
+    rl.style.cssText=`width:${SZ*0.7}px;height:${SZ}px;font-size:${AX}px;`;
+    rl.textContent=r;
+    rowDiv.appendChild(rl);
+
+    for(let c=0;c<N;c++){
+      const cell=document.createElement('div');
+      cell.className='cell '+((r+c)%2===0?'cl':'cd');
+      cell.id=`cl${r}_${c}`;
+      cell.style.cssText=`width:${SZ}px;height:${SZ}px;`;
+      rowDiv.appendChild(cell);
+    }
+    br.appendChild(rowDiv);
+  }
+}
+
+// ── Render cells ──
+function redraw() {
+  const reach=getReach();
+  const rs=new Set(reach.map(([r,c])=>`${r},${c}`));
+
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const cell=document.getElementById(`cl${r}_${c}`);
+      if(!cell) continue;
+      cell.className='cell '+((r+c)%2===0?'cl':'cd');
+      cell.innerHTML='';
+      cell.onclick=null;
+
+      const isP  = PM[r][c]==='P';
+      const isWin= r===0&&c===0;
+      const isQ  = r===qR&&c===qC;
+      const isR  = rs.has(`${r},${c}`)&&!over;
+
+      if(isWin){
+        cell.classList.add('is-win');
+        const w=document.createElement('span');
+        w.className='win-lbl';
+        w.style.fontSize=Math.max(6,SZ*0.24)+'px';
+        w.textContent='0,0';
+        cell.appendChild(w);
+      }
+      if(isQ){
+        cell.classList.add('is-queen');
+        const q=document.createElement('span');
+        q.className='qg qp'+turn;
+        q.style.fontSize=Math.max(10,SZ*0.60)+'px';
+        q.textContent='♛';
+        cell.appendChild(q);
+      }
+      if(showP&&isP&&!isQ&&!isWin) cell.classList.add('is-ppos');
+      if(isR){
+        cell.classList.add('is-reach');
+        if(showP&&isP) cell.classList.add('is-ppos');
+        const r2=r,c2=c;
+        cell.onclick=()=>doMove(r2,c2);
+      }
+    }
+  }
+  updateUI();
+}
+
+function getReach(){
+  const cells=[];
+  for(let nc=qC-1;nc>=0;nc--) cells.push([qR,nc]);
+  for(let nr=qR-1;nr>=0;nr--) cells.push([nr,qC]);
+  for(let d=1;qR-d>=0&&qC-d>=0;d++) cells.push([qR-d,qC-d]);
+  return cells;
+}
+
+function doMove(r,c){
+  if(over) return;
+  const from=`(${qC},${qR})`;
+  qR=r;qC=c;moves++;
+  addLog(from,`(${c},${r})`);
+  if(r===0&&c===0){
+    over=true;
+    redraw();
+    setTimeout(showWin,320);
+    return;
+  }
+  turn=turn===1?2:1;
+  redraw();
+}
+
+function updateUI(){
+  const type=PM[qR][qC];
+  const reach=getReach();
+
+  // Status
+  const sb=document.getElementById('status-bar');
+  if(over){
+    sb.innerHTML=`<span style="font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--gold2);">Player ${turn} moved to (0,0) — wins!</span>`;
+  } else {
+    const col=turn===1?'var(--p1c)':'var(--p2c)';
+    const tag=type==='P'
+      ?`<span class="s-tag pp">P-position</span>`
+      :`<span class="s-tag np">N-position</span>`;
+    sb.innerHTML=`Player&nbsp;<strong style="color:${col};">${turn}</strong>&nbsp;to move &nbsp;·&nbsp; queen at (${qC},${qR})&nbsp;${tag}`;
+  }
+
+  // Player blocks
+  document.getElementById('blk1').className='player-block'+(turn===1&&!over?' act1':'');
+  document.getElementById('blk2').className='player-block'+(turn===2&&!over?' act2':'');
+
+  // Stats
+  document.getElementById('s-pos').textContent=`(${qC},${qR})`;
+  document.getElementById('s-moves').textContent=moves;
+  const te=document.getElementById('s-type');
+  te.textContent=type==='P'?'P-pos':'N-pos';
+  te.style.color=type==='P'?'var(--ppos-dot)':'var(--cream)';
+  document.getElementById('s-opts').textContent=over?'0':reach.length;
+
+  // PP table highlight
+  document.querySelectorAll('#pp-tbody tr').forEach(t=>t.classList.remove('hl'));
+  const hl=document.getElementById(`pp${qC}_${qR}`);
+  if(hl){hl.classList.add('hl');hl.scrollIntoView({block:'nearest',behavior:'smooth'});}
+}
+
+function addLog(from,to){
+  const log=document.getElementById('move-log');
+  const d=document.createElement('div');
+  d.className=`log-e lp${turn}`;
+  const isP=PM[qR][qC]==='P';
+  d.innerHTML=`<span class="lp">P${turn}</span><span>${from}→${to}${isP?' ·':''}</span>`;
+  log.prepend(d);
+}
+
+function buildPPTable(){
+  const tb=document.getElementById('pp-tbody');
+  tb.innerHTML='';
+  PP.forEach(({n,c,r})=>{
+    const addRow=(col,row)=>{
+      const tr=document.createElement('tr');
+      tr.id=`pp${col}_${row}`;
+      tr.innerHTML=`<td>${n}</td><td>${col}</td><td>${row}</td>`;
+      tb.appendChild(tr);
+    };
+    addRow(c,r);
+    if(c!==r) addRow(r,c);
+  });
+}
+
+function toggleP(){
+  showP=!showP;
+  document.getElementById('btn-p').textContent=showP?'Hide P-positions':'Show P-positions';
+  redraw();
+}
+
+// ── Modals ──
+function showWin(){
+  document.getElementById('m-win').style.display='block';
+  document.getElementById('m-rules').style.display='none';
+  document.getElementById('m-title').textContent=`Player ${turn} wins!`;
+  document.getElementById('m-body').textContent=`The queen reached (0,0) after ${moves} move${moves!==1?'s':''}. Excellent play!`;
+  document.getElementById('overlay').classList.add('show');
+}
+function showRules(){
+  document.getElementById('m-win').style.display='none';
+  document.getElementById('m-rules').style.display='block';
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('overlay')) closeModal(); });
+
+// ── Resize ──
+let rTimer;
+window.addEventListener('resize',()=>{
+  clearTimeout(rTimer);
+  rTimer=setTimeout(()=>{
+    if(!document.getElementById('screen-game').classList.contains('hidden')){
+      buildBoard(); redraw();
+    }
+  },120);
+});
+
+hint();
+</script>
+</body>
+</html>
